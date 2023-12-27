@@ -11,10 +11,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aultimus/webrtc/v3"
+	"github.com/aultimus/webrtc/v3/examples/internal/signal"
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/stats"
-	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/examples/internal/signal"
 )
 
 // nolint:gocognit
