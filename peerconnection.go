@@ -10,6 +10,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +23,7 @@ import (
 
 	"github.com/aultimus/webrtc/v3/internal/util"
 	"github.com/aultimus/webrtc/v3/pkg/rtcerr"
+	gocache "github.com/patrickmn/go-cache"
 	"github.com/pion/ice/v2"
 	"github.com/pion/interceptor"
 	"github.com/pion/logging"
@@ -28,6 +31,12 @@ import (
 	"github.com/pion/sdp/v3"
 	"github.com/pion/srtp/v2"
 )
+
+var cache *gocache.Cache
+
+func init() {
+	cache = gocache.New(5*time.Minute, 10*time.Minute)
+}
 
 // PeerConnection represents a WebRTC connection that establishes a
 // peer-to-peer communications with another PeerConnection instance in a
@@ -190,6 +199,17 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	})
 
 	pc.interceptorRTCPWriter = pc.api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
+
+	candidates := cache.Items()
+	fmt.Printf("adding %d cached ice candidates\n", len(candidates))
+	for key, item := range candidates {
+		candidate := item.Object.(ICECandidateInit)
+		fmt.Printf("adding cached ice candidate <%s>\n", key[0:6])
+		err := pc.AddICECandidate(candidate)
+		if err != nil {
+			fmt.Printf("error adding cached ice candidate: %s\n", err)
+		}
+	}
 
 	return pc, nil
 }
@@ -1746,7 +1766,25 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 		iceCandidate = &c
 	}
 
-	return pc.iceTransport.AddRemoteCandidate(iceCandidate)
+	err := pc.iceTransport.AddRemoteCandidate(iceCandidate)
+	if err != nil {
+		// cache each ice candidate that is successfully saved
+		// for five minutes
+		h := sha256.New()
+		b, err := json.Marshal(candidate)
+		if err != nil {
+			panic(err.Error()) // for debugging
+		}
+		h.Write(b)
+		key := string(h.Sum(nil))
+
+		_, found := cache.Get(key)
+		if !found {
+			cache.Set(key, candidate, 5*time.Minute)
+			fmt.Printf("setting ice candidate in cache <%s>\n", key[:6])
+		}
+	}
+	return err
 }
 
 // ICEConnectionState returns the ICE connection state of the
