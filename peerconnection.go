@@ -201,7 +201,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	pc.interceptorRTCPWriter = pc.api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
 
 	pc.OnICECandidate(func(c *ICECandidate) {
-		fmt.Printf("OnICECandidate called")
+		fmt.Printf("OnICECandidate called\n")
 		if c != nil {
 			// cache each ice candidate that is successfully saved
 			// for five minutes
@@ -215,7 +215,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 
 			_, found := cache.Get(key)
 			if !found {
-				cache.Set(key, c, 5*time.Minute)
+				cache.Set(key, *c, 5*time.Minute)
 				fmt.Printf("setting ice candidate in cache <%s>\n", key[:6])
 			}
 		} else {
@@ -227,9 +227,9 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	candidates := cache.Items()
 	fmt.Printf("adding %d cached ice candidates\n", len(candidates))
 	for key, item := range candidates {
-		candidate := item.Object.(ICECandidateInit)
+		candidate := item.Object.(ICECandidate)
 		fmt.Printf("adding cached ice candidate <%s>\n", key[0:6])
-		err := pc.AddICECandidate(candidate)
+		err := pc.iceTransport.AddRemoteCandidate(&candidate)
 		if err != nil {
 			fmt.Printf("error adding cached ice candidate: %s\n", err)
 		}
@@ -1790,25 +1790,7 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 		iceCandidate = &c
 	}
 
-	err := pc.iceTransport.AddRemoteCandidate(iceCandidate)
-	if err != nil {
-		// cache each ice candidate that is successfully saved
-		// for five minutes
-		h := sha256.New()
-		b, err := json.Marshal(candidate)
-		if err != nil {
-			panic(err.Error()) // for debugging
-		}
-		h.Write(b)
-		key := string(h.Sum(nil))
-
-		_, found := cache.Get(key)
-		if !found {
-			cache.Set(key, candidate, 5*time.Minute)
-			fmt.Printf("setting ice candidate in cache <%s>\n", key[:6])
-		}
-	}
-	return err
+	return pc.iceTransport.AddRemoteCandidate(iceCandidate)
 }
 
 // ICEConnectionState returns the ICE connection state of the
