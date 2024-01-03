@@ -201,8 +201,8 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	pc.interceptorRTCPWriter = pc.api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
 
 	pc.OnICECandidate(func(c *ICECandidate) {
-		err := pc.iceTransport.AddRemoteCandidate(c)
-		if err != nil {
+		fmt.Printf("OnICECandidate called")
+		if c != nil {
 			// cache each ice candidate that is successfully saved
 			// for five minutes
 			h := sha256.New()
@@ -219,8 +219,9 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 				fmt.Printf("setting ice candidate in cache <%s>\n", key[:6])
 			}
 		} else {
-			fmt.Printf("err: %s\n", err.Error())
+			fmt.Printf("ice gathering done")
 		}
+
 	})
 
 	candidates := cache.Items()
