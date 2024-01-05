@@ -270,6 +270,10 @@ func (g *ICEGatherer) setState(s ICEGathererState) {
 	}
 }
 
+func (g *ICEGatherer) GetAgent() *ice.Agent {
+	return g.getAgent()
+}
+
 func (g *ICEGatherer) getAgent() *ice.Agent {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
